@@ -1,0 +1,251 @@
+\documentclass[a4paper, 12pt]{article}
+
+% --- KÓDOVÁNÍ, JAZYK A FONT ---
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[czech]{babel}
+\usepackage{lmodern}      % Kvalitní vektorový font
+\usepackage{mathptmx}     % Volitelné: Font Times New Roman (častý požadavek škol)
+
+% --- NASTAVENÍ STRÁNKY ---
+\usepackage[margin=2.5cm]{geometry} % Standardní okraje 2.5 cm
+\usepackage{setspace}     % Pro nastavení řádkování
+\onehalfspacing           % Řádkování 1.5 (standard pro VŠ práce)
+
+% --- TYPOGRAFICKÉ ÚPRAVY ---
+\usepackage{microtype}    % Optické vyrovnání okrajů textu
+\usepackage{csquotes}     % Správné české uvozovky
+\usepackage{parskip}      % Oddělení odstavců mezerou
+
+% --- BALÍČKY PRO GRAFIKU A TABULKY ---
+\usepackage{graphicx}
+\usepackage{float}        % Pro vynucení pozice obrázků [H]
+\usepackage{booktabs}     % Profesionální vodorovné linky v tabulkách
+\usepackage{caption}      % Lepší formátování popisků
+
+% --- MATEMATIKA ---
+\usepackage{amsmath}
+
+% --- ODKAZY (ČISTÉ, BEZ RÁMEČKŮ) ---
+\usepackage[
+    hidelinks,            % Odstraní barevné rámečky
+    pdfauthor={Jindřich Zeman},
+    pdftitle={Filament DryBox Monitor},
+    pdfsubject={Technická dokumentace},
+    bookmarksnumbered=true
+]{hyperref}
+
+% --- FORMÁTOVÁNÍ KÓDU ---
+\usepackage{listings}
+\usepackage{xcolor}
+
+\definecolor{bg}{rgb}{0.97,0.97,0.97}
+\definecolor{comment}{rgb}{0.4,0.4,0.4}
+\definecolor{keyword}{rgb}{0.0,0.0,0.5}
+\definecolor{string}{rgb}{0.0,0.5,0.0}
+
+\lstdefinestyle{code}{
+    backgroundcolor=\color{bg},
+    commentstyle=\color{comment}\itshape,
+    keywordstyle=\color{keyword}\bfseries,
+    stringstyle=\color{string},
+    basicstyle=\ttfamily\small,
+    breakatwhitespace=false,
+    breaklines=true,
+    captionpos=b,
+    keepspaces=true,
+    numbers=left,
+    numbersep=10pt,
+    showspaces=false,
+    showstringspaces=false,
+    showtabs=false,
+    tabsize=4,
+    frame=lines,          % Linky nahoře a dole
+    inputencoding=utf8,
+    extendedchars=true,
+    literate={á}{{\'a}}1 {č}{{\v{c}}}1 {ď}{{\v{d}}}1 {é}{{\'e}}1 {ě}{{\v{e}}}1 
+             {í}{{\'i}}1 {ň}{{\v{n}}}1 {ó}{{\'o}}1 {ř}{{\v{r}}}1 {š}{{\v{s}}}1 
+             {ť}{{\v{t}}}1 {ú}{{\'u}}1 {ů}{{\r{u}}}1 {ý}{{\'y}}1 {ž}{{\v{z}}}1
+}
+\lstset{style=code}
+
+% ==========================================
+% HLAVNÍ ČÁST DOKUMENTU
+% ==========================================
+\begin{document}
+
+% --- TITULNÍ STRANA ---
+\begin{titlepage}
+    \centering
+    % Pokud máš název školy, doplň ho sem, jinak nech obecné nebo smaž
+    {\Large \textsc{Západoceská univerzita v Plzni}} \\ 
+    \vspace{0.5cm}
+    {\large Fakulta aplikovaných věd} \\
+    \vspace{0.5cm}
+    {\large Katedra informatiky a výpočetní techniky}
+    
+    \vfill % Dynamická mezera
+    
+    \textbf{\huge Filament DryBox Monitor} \\
+    \vspace{1cm}
+    {\Large Semestrální práce z předmětu ZPI}
+    
+    \vfill
+    
+    \begin{flushleft}
+        \large
+        \textbf{Autor:} Jindřich Zeman \\
+        \textbf{Obor:} Internet věcí (IoT) \\ % Doplň svůj obor
+        \textbf{Datum:} \today
+    \end{flushleft}
+\end{titlepage}
+
+% --- ABSTRAKT ---
+\thispagestyle{plain}
+\pagenumbering{roman} % Římské číslování pro úvodní listy
+
+\section*{Abstrakt}
+Cílem této práce je návrh a realizace monitorovacího zařízení pro sušící boxy (DryBox) využívané při skladování 3D tiskových materiálů. Zařízení řeší problematiku degradace hygroskopických materiálů vlivem vzdušné vlhkosti. Systém je postaven na platformě Raspberry Pi Pico 2 W a využívá architekturu IoT pro sběr, zpracování a distribuci dat. Naměřené hodnoty (teplota, vlhkost, rosný bod) jsou vizualizovány lokálně na OLED displeji a vzdáleně prostřednictvím webového rozhraní a cloudu HiveMQ.
+
+\vspace{1cm}
+\textbf{Klíčová slova:} IoT, Raspberry Pi Pico, MQTT, SHT40, Rosný bod, Asynchronní programování.
+
+\newpage
+
+% --- OBSAH ---
+\tableofcontents
+\newpage
+
+% --- ZAČÁTEK HLAVNÍHO TEXTU ---
+\pagenumbering{arabic} % Arabské číslování od 1
+
+% ==========================================
+\section{Úvod}
+% ==========================================
+Aditivní výroba (3D tisk) klade vysoké nároky na kvalitu vstupního materiálu. Většina běžně používaných polymerů, jako jsou PLA, PETG či Nylon, je hygroskopická. To znamená, že pohlcují vzdušnou vlhkost z okolního prostředí. Nasycení filamentu vodou vede při tisku k expanzi páry v trysce, což způsobuje defekty na výtisku a snižuje jeho mechanickou pevnost.
+
+Pro prevenci tohoto jevu se materiály skladují v hermeticky uzavřených boxech s vysoušedlem (tzv. DryBox). Běžné řešení však postrádá "chytrou" funkcionalitu – uživatel nemá přehled o nasycení vysoušedla ani o riziku kondenzace při změně teploty.
+
+Tato práce popisuje vývoj zařízení \textbf{Filament DryBox Monitor}, které poskytuje telemetrii v reálném čase a varuje před kritickými stavy prostředí.
+
+\newpage 
+
+% ==========================================
+\section{Analýza a výběr technologií}
+% ==========================================
+Při návrhu zařízení byl kladen důraz na nízkou spotřebu, přesnost měření a bezpečnost síťové komunikace. Tato kapitola zdůvodňuje výběr jednotlivých komponent a technologií.
+
+\subsection{Hardwarová platforma: Raspberry Pi Pico 2 W}
+Pro řízení systému byl zvolen mikrokontrolér Raspberry Pi Pico 2 W. Hlavní důvody pro tuto volbu jsou:
+\begin{itemize}
+    \item \textbf{Výkon a konektivita:} Čip RP2350 disponuje dostatečným výkonem pro šifrovanou komunikaci (SSL/TLS) a integrovaný Wi-Fi modul (802.11n) eliminuje potřebu externích síťových prvků.
+    \item \textbf{Podpora MicroPythonu:} Oficiální podpora tohoto jazyka umožňuje rychlý vývoj a využití moderních programovacích paradigmat (např. \texttt{asyncio}).
+    \item \textbf{Cena a dostupnost:} Poměr cena/výkon je v kategorii IoT zařízení bezkonkurenční.
+\end{itemize}
+
+\subsection{Senzorika: Sensirion SHT40}
+Pro měření environmentálních veličin nebyl použit levný senzor DHT11/22 (který trpí vysokou chybovostí a hysterezí), ale průmyslový standard \textbf{SHT40}.
+\begin{itemize}
+    \item \textbf{Přesnost:} Typická odchylka $\pm 1.8\,\% RH$ je klíčová pro přesný výpočet rosného bodu.
+    \item \textbf{Rozhraní:} Komunikace přes sběrnici I$^2$C je robustnější než proprietární protokoly levných čidel.
+\end{itemize}
+
+\subsection{Komunikační protokol: MQTT}
+Pro přenos dat do cloudu byl zvolen protokol \textbf{MQTT} (Message Queuing Telemetry Transport) místo běžného HTTP.
+\begin{itemize}
+    \item \textbf{Efektivita:} MQTT je navržen pro sítě s vysokou latencí a nízkou propustností. Oproti HTTP má výrazně menší datovou hlavičku (overhead).
+    \item \textbf{Model Publish/Subscribe:} Zařízení nemusí čekat na odezvu serveru pro každou zprávu, což šetří čas procesoru i energii.
+    \item \textbf{Bezpečnost:} Cloudová implementace (HiveMQ) vyžaduje šifrování SSL/TLS, což zajišťuje integritu dat.
+\end{itemize}
+
+\newpage
+
+% ==========================================
+\section{Návrh a realizace}
+% ==========================================
+Tato kapitola popisuje technické řešení, zapojení a softwarovou architekturu.
+
+\subsection{Schéma zapojení}
+Systém využívá dvě oddělené I$^2$C sběrnice mikrokontroléru, aby se předešlo konfliktům adres a rušení mezi displejem a senzorem.
+
+\begin{table}[H]
+\centering
+\caption{Zapojení komponent k Raspberry Pi Pico}
+\label{tab:wiring}
+\begin{tabular}{@{}llcc@{}}
+\toprule
+\textbf{Periferie} & \textbf{Pin MCU} & \textbf{Funkce} & \textbf{Sběrnice} \\ \midrule
+\textbf{OLED Displej} & GP0 & SDA & I2C0 \\
+(Řadič SH1106)       & GP1 & SCL & I2C0 \\ \midrule
+\textbf{Senzor SHT40} & GP2 & SDA & I2C1 \\
+                     & GP3 & SCL & I2C1 \\ \bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Softwarová architektura}
+Aplikace není psána jako sekvenční smyčka (což by blokovalo běh programu při síťové komunikaci), ale využívá kooperativní multitasking pomocí knihovny \texttt{uasyncio}.
+
+Program se skládá ze tří asynchronních úloh (\textit{Tasks}), které běží kvazi-paralelně:
+\begin{enumerate}
+    \item \textbf{Task Měření a UI:} S periodou 3 sekund vyčítá data, počítá rosný bod a překresluje OLED displej.
+    \item \textbf{Task Webserver:} Běží na pozadí a čeká na HTTP požadavky na portu 80. Poskytuje "Dark Mode" dashboard.
+    \item \textbf{Task Cloud:} S periodou 30 sekund odesílá data přes MQTT. Tento proces zahrnuje řízení paměti (Garbage Collection), aby nedošlo k přetečení RAM při náročném SSL handshaku.
+\end{enumerate}
+
+\subsection{Výpočet rosného bodu}
+Rosný bod ($T_{dp}$) je teplota, při které je vzduch maximálně nasycen vodními parami. Pokud teplota klesne pod tuto hodnotu, dochází ke kondenzaci. Pro výpočet byl implementován \textbf{Magnusův vzorec}:
+
+\begin{equation}
+    T_{dp} = \frac{237,7 \cdot \ln\left(\frac{RH}{100} \cdot e^{\frac{17,27 \cdot T}{237,7 + T}}\right)}{17,27 - \ln\left(\frac{RH}{100} \cdot e^{\frac{17,27 \cdot T}{237,7 + T}}\right)}
+\end{equation}
+
+Kde $T$ je teplota ve stupních Celsia a $RH$ je relativní vlhkost v procentech.
+
+\newpage
+
+% ==========================================
+\section{Zprovoznění a konfigurace}
+% ==========================================
+Zařízení je navrženo jako "Plug \& Play", avšak vyžaduje úvodní konfiguraci síťových parametrů.
+
+\subsection{Instalace firmwaru}
+\begin{enumerate}
+    \item Připojte Raspberry Pi Pico 2 W k PC při stisknutém tlačítku BOOTSEL.
+    \item Nahrajte aktuální verzi MicroPython firmwaru (soubor \texttt{.uf2}).
+    \item Do kořenového adresáře nahrajte soubory projektu (\texttt{main.py}, \texttt{simple.py}, \texttt{sh1106.py}, \texttt{sht40.py}).
+\end{enumerate}
+
+\subsection{Bezpečnostní konfigurace}
+Přihlašovací údaje nejsou součástí zdrojového kódu. Uživatel musí vytvořit soubor \texttt{secrets.py} dle následujícího schématu. Tento soubor je následně vyloučen ze verzování (git ignore) pro zachování bezpečnosti.
+
+\begin{lstlisting}[language=Python, caption=Struktura konfiguračního souboru secrets.py]
+secrets = {
+   'ssid': 'NAZEV_WIFI_SITE',
+   'password': 'HESLO_WIFI',
+   
+   # Nastavení HiveMQ Cloudu
+   'mqtt_broker': 'adresa_clusteru.hivemq.cloud',
+   'mqtt_port': 8883,
+   'mqtt_user': 'uzivatel',
+   'mqtt_pass': 'heslo',
+}
+\end{lstlisting}
+
+\newpage
+
+% ==========================================
+\section{Závěr}
+% ==========================================
+V rámci této práce bylo navrženo a realizováno IoT zařízení pro monitorování podmínek skladování 3D tiskových materiálů. 
+
+Podařilo se splnit všechny stanovené cíle:
+\begin{itemize}
+    \item Zařízení měří teplotu a vlhkost s využitím profesionálního senzoru.
+    \item Výpočet rosného bodu poskytuje uživateli relevantní informaci o riziku navlhnutí materiálu.
+    \item Implementace MQTT s SSL šifrováním zajišťuje bezpečnou integraci do chytré domácnosti.
+    \item Optimalizace paměti pomocí Garbage Collectoru vyřešila problémy se stabilitou na mikrokontroléru.
+\end{itemize}
+
+Výsledné zařízení představuje cenově dostupné, ale technicky pokročilé řešení problému degradace filamentů.
+
+\end{document}
