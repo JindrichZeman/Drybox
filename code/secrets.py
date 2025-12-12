@@ -1,8 +1,10 @@
 # Soubor: secrets.py
 
 secrets = {
-   'ssid': 'Zemanovi',
-   'password': 'Andelka791',
+   #'ssid': 'Zemanovi',
+   #'password': 'Andelka791',
+   'ssid': 'Realme',
+   'password': 'Hotspot23',
    
    # Údaje z HiveMQ Cloudu (opsáno z tvého obrázku)
    'mqtt_broker': 'd1d2a37c983240a8ab45352a50cda20d.s1.eu.hivemq.cloud',
